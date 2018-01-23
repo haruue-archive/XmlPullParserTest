@@ -1,0 +1,32 @@
+apply plugin: 'java-library'
+apply plugin: 'kotlin'
+
+dependencies {
+    compileOnly gradleApi()
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "com.android.tools.build:gradle:$android_plugin_version"
+//    implementation "com.android.tools.build:gradle:$android_plugin_version:sources"
+    implementation"org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
+    implementation "org.ogce:xpp3:1.1.6"
+}
+
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"
+
+apply plugin: 'maven'
+group = 'moe.haruue.gradle.plugin'
+version = library_version
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: uri('../.m2'))
+        }
+    }
+}
+
+tasks.whenTaskAdded {
+    if (it.name == 'jar') {
+        uploadArchives.dependsOn it
+    }
+}
