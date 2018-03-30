@@ -2,7 +2,7 @@
 
 buildscript {
     ext.library_version = '1.0.0-SPANSHOT'
-    ext.kotlin_version = '1.2.10'
+    ext.kotlin_version = '1.2.31'
     ext.android_plugin_version = '3.0.1'
     repositories {
         maven { url './.m2' }
@@ -10,7 +10,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:$android_plugin_version"
+        classpath 'com.android.tools.build:gradle:3.1.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "moe.haruue.gradle.plugin:test:$library_version"
 

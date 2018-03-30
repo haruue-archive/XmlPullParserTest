@@ -1,24 +1,28 @@
 package moe.haruue.layoutinflatertest
 
+import android.content.Context
 import android.os.Bundle
-import android.support.design.widget.Snackbar
 import android.support.v7.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
-
-import kotlinx.android.synthetic.main.activity_main.*
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        setSupportActionBar(toolbar)
 
-        fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
-        }
+        setContentView(layout(this))
+
+    }
+
+    fun layout(context: Context): View {
+        val linearLayout = LinearLayout(context, CustomAttributeSetFactory.obtainAttributeSet())
+        val textView = TextView(context)
+
+        return linearLayout
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

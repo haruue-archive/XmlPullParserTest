@@ -1,6 +1,9 @@
 package moe.haruue.gradle.plugin.test
 
 import com.android.build.gradle.AppExtension
+import com.squareup.javapoet.JavaFile
+import com.squareup.javapoet.MethodSpec
+import com.squareup.javapoet.TypeSpec
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.xmlpull.mxp1.MXParserFactory
@@ -8,6 +11,7 @@ import org.xmlpull.v1.XmlPullParser.*
 import org.xmlpull.v1.XmlPullParserException
 import java.io.File
 import java.util.*
+import javax.lang.model.element.Modifier
 
 /**
  *
@@ -31,7 +35,10 @@ class TestPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         log("apply(${project.name})")
+        log("project.buildDir: ${project.buildDir}")
+        log("project.buildFile: ${project.buildFile}")
         project.extensions.findByType(AppExtension::class.java).run {
+            this ?: return@run
             val res = sourceSets.map { it.res }.flatMap { it.sourceFiles }
             val layouts = res.filter {
                 if (it.extension == "xml") {
@@ -43,9 +50,52 @@ class TestPlugin : Plugin<Project> {
             layouts.forEach {
                 val result = layout(it).toString()
                 log("xml parse result for $it: \n$result")
+                log("===============================")
+                log("xml java parse result for $it \n")
             }
 
+
+            val aptOutputRoot = File(project.buildDir.absolutePath, "generated/source/apt")
+            log("aptOutputRoot: ${aptOutputRoot.absolutePath}")
+            applicationVariants.all {
+                log("applicationVariant.dirName: ${it.dirName}")
+                val aptOutputDir = File(aptOutputRoot, it.dirName)
+                aptOutputDir.mkdirs()
+                log("aptOutputDir: ${aptOutputDir.absolutePath}")
+
+                writeJavaFile(aptOutputDir)
+
+                layouts.forEach {
+                    xmlPullParser.setInput(it.reader())
+                    LayoutParser("moe.haruue.layoutinflatertest",
+                            it.name.removeSuffix(".xml"),
+                            xmlPullParser).toJavaFile().writeTo(aptOutputDir)
+                }
+            }
         }
+    }
+
+    val T = "${'$'}T"
+    val S = "${'$'}S"
+
+    private fun writeJavaFile(dst: File) {
+        val main = MethodSpec.methodBuilder("main").apply {
+            addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+            returns(Void.TYPE)
+            addParameter(Array<String>::class.java, "args")
+            addStatement("$T.out.println($S)", System::class.java, "Hello, JavaPoet")
+        }.build()
+
+        val hello = TypeSpec.classBuilder("HelloWorld").apply {
+            addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            addMethod(main)
+        }.build()
+
+        val javaFile = JavaFile.builder("moe.haruue.generated", hello).apply {
+
+        }.build()
+
+        javaFile.writeTo(dst)
     }
 
     private fun File.isLayout(): Boolean {
@@ -75,9 +125,10 @@ class TestPlugin : Plugin<Project> {
     class XmlAttr(val name: String,
                   val value: String,
                   val namespace: String,
-                  val prefix: String) {
+                  val prefix: String,
+                  val type: String) {
         override fun toString(): String {
-            return "$prefix:$name=\"$value\""
+            return "$prefix:$name=\"$value\" (type=$type)"
         }
     }
 
@@ -117,7 +168,8 @@ class TestPlugin : Plugin<Project> {
                                     name = getAttributeName(i),
                                     value = getAttributeValue(i),
                                     namespace = getAttributeNamespace(i),
-                                    prefix = getAttributePrefix(i)
+                                    prefix = getAttributePrefix(i),
+                                    type = getAttributeType(i)
                             ))
                         }
                         if (!stack.empty()) {
