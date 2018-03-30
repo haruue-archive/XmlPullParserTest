@@ -95,7 +95,7 @@ class LayoutParser(
 
         // field name && set id or not
         var field = attrs["android:id"]
-        val hasId = field == null
+        val hasId = field != null
         if (field == null) {
             field = "$PREFIX_NOID${currentNoId++}"
         } else {
