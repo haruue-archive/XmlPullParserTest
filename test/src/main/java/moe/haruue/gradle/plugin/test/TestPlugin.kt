@@ -1,9 +1,7 @@
 package moe.haruue.gradle.plugin.test
 
 import com.android.build.gradle.AppExtension
-import com.squareup.javapoet.JavaFile
-import com.squareup.javapoet.MethodSpec
-import com.squareup.javapoet.TypeSpec
+import com.squareup.javapoet.*
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.xmlpull.mxp1.MXParserFactory
@@ -63,7 +61,8 @@ class TestPlugin : Plugin<Project> {
                 aptOutputDir.mkdirs()
                 log("aptOutputDir: ${aptOutputDir.absolutePath}")
 
-                writeJavaFile(aptOutputDir)
+//                writeJavaFile(aptOutputDir)
+/*
 
                 layouts.forEach {
                     xmlPullParser.setInput(it.reader())
@@ -71,6 +70,25 @@ class TestPlugin : Plugin<Project> {
                             it.name.removeSuffix(".xml"),
                             xmlPullParser).toJavaFile().writeTo(aptOutputDir)
                 }
+*/
+
+                log("applicationVariant.applicationId: ${it.applicationId}")
+                log("packageName == applicationVariant.generateBuildConfig.buildConfigPackageName: ${it.generateBuildConfig.buildConfigPackageName}")
+                log("rootDir == project.rootDir: ${project.rootDir}")
+                log("projectDir == project.projectDir : ${project.projectDir}")
+                log("buildDir == project.buildDir: ${project.buildDir}")
+                log("resDir == sourceSets.map...: ${sourceSets.map { it.res }.flatMap { it.srcDirs }}")
+                log("all res == sourceSets.map...: ${sourceSets.map { it.res }.flatMap { it.sourceFiles }}")
+                log("layout == sourceSets.map...: ${sourceSets.map { it.res }.flatMap { it.sourceFiles }.filter { it.isLayout() }}")
+
+                val rootDir = project.rootDir
+                val projectDir = project.projectDir
+                val packageName = it.generateBuildConfig.buildConfigPackageName
+                val buildDir = project.buildDir
+                val resDirs = sourceSets.map { it.res }.flatMap { it.srcDirs }
+                val layouts = sourceSets.map { it.res }.flatMap { it.sourceFiles }.filter { it.isLayout() }
+
+                writeBuildInfoFile(aptOutputDir, rootDir, projectDir, packageName, buildDir, resDirs, layouts)
             }
         }
     }
@@ -98,8 +116,37 @@ class TestPlugin : Plugin<Project> {
         javaFile.writeTo(dst)
     }
 
+    private fun writeBuildInfoFile(aptOutputDir: File,
+                                   rootDir: File, projectDir: File, packageName: String,
+                                   buildDir: File, resDir: List<File>, layouts: List<File>) {
+
+        val annotation = AnnotationSpec.builder(
+                ClassName.get("moe.haruue.annotation", "LayoutBuildInfo")).apply {
+            addMember("rootDir", S, rootDir.absolutePath)
+            addMember("projectDir", S, projectDir.absolutePath)
+            addMember("packageName", S, packageName)
+            addMember("buildDir", S, buildDir.absolutePath)
+            addMember("resDirs", resDir.joinToString(separator = "\",\"",
+                    prefix = "{\"", postfix = "\"}") { it.absolutePath })
+            addMember("layouts", layouts.joinToString(separator = "\",\"",
+                    prefix = "{\"", postfix = "\"}") { it.absolutePath })
+        }.build()
+
+        val info = TypeSpec.classBuilder("LayoutBuildingInfoStub").apply {
+            addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            addAnnotation(annotation)
+        }.build()
+
+        val file = JavaFile.builder("$packageName.generated.layout", info)
+                .build()
+
+        file.writeTo(aptOutputDir)
+    }
+
     private fun File.isLayout(): Boolean {
-        xmlPullParser.setInput(reader())
+        return extension == "xml" &&
+                parentFile.name.matches(Regex("^layout(-[A-Za-z0-9_]+)*"))
+/*        xmlPullParser.setInput(reader())
         var result = false
         try {
             parse@ while (true) {
@@ -119,7 +166,7 @@ class TestPlugin : Plugin<Project> {
         } catch (e: XmlPullParserException) {
             err("failure in parse xml file: $this", e)
         }
-        return result
+        return result*/
     }
 
     class XmlAttr(val name: String,
