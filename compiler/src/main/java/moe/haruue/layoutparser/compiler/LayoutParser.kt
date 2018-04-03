@@ -1,6 +1,10 @@
-package moe.haruue.gradle.plugin.test
+package moe.haruue.layoutparser.compiler
 
 import com.squareup.javapoet.*
+import moe.haruue.layoutparser.compiler.tools.cnActivity
+import moe.haruue.layoutparser.compiler.tools.cnContext
+import moe.haruue.layoutparser.compiler.tools.toClassName
+import moe.haruue.layoutparser.compiler.tools.underlineToUpperCamel
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParser.*
 import java.util.*
@@ -18,15 +22,15 @@ class LayoutParser(
 
     companion object {
         // fuck kotlin string format
-        val S = "${'$'}S"
-        val T = "${'$'}T"
-        val N = "${'$'}N"
+        val L = "\$L"
+        val S = "\$S"
+        val T = "\$T"
+        val N = "\$N"
+        // prefixes
         val PREFIX = "__view_"
         val PREFIX_NOID = "${PREFIX}noid_"
         val ROOT_VIEW_NAME = "${PREFIX}root"
-        fun paramNameOf(fieldName: String) = "${PREFIX}param$fieldName"
-        val CONTEXT_CLASS_NAME = ClassName.get("android.content", "Context")
-        val ACTIVITY_CLASSNAME = ClassName.get("android.app", "Activity")
+        fun layoutParamsNameOf(fieldName: String) = "${PREFIX}lp$fieldName"
     }
 
     object DimensionUnit {
@@ -66,7 +70,7 @@ class LayoutParser(
         initToolsMethods()
         constructorBuilder = MethodSpec.constructorBuilder().apply {
             addModifiers(Modifier.PRIVATE)
-            addParameter(CONTEXT_CLASS_NAME, "context")
+            addParameter(cnContext, "context")
         }
         with(xml) {
             read@ while (true) {
@@ -120,7 +124,7 @@ class LayoutParser(
 
     private fun generateJavaCodeForTag(name: String, type: String, hasId: Boolean, attrs: Map<String, String>,
                                        width: Dimension, height: Dimension, isRoot: Boolean, parent: ViewType) {
-        val typeClassName = type.parseClassName()
+        val typeClassName = type.toClassName()
         val field = FieldSpec.builder(typeClassName, name,
                 if (hasId) Modifier.PUBLIC else Modifier.PRIVATE,
                 Modifier.FINAL).build()
@@ -128,24 +132,25 @@ class LayoutParser(
 
         constructorBuilder.addComment("===== init $name: $type =====")
 
-        val parentClassName = parent.type.parseClassName()
-        val layoutParamsName = paramNameOf(name)
+        val parentClassName = parent.type.toClassName()
+        val layoutParamsName = layoutParamsNameOf(name)
 
-        constructorBuilder.addCode("""
-            this.$name = new $T(context);
-            $T.LayoutParams $layoutParamsName = new $T.LayoutParams(${width.value}, ${height.value});
-        """.trimIndent(), typeClassName,
-                parentClassName, parentClassName)
+        constructorBuilder.addStatement("""
+            this.$name = new $T(context)
+        """.trimIndent(), typeClassName)
+        constructorBuilder.addStatement("""
+            $T.LayoutParams $layoutParamsName = new $T.LayoutParams(${width.value}, ${height.value})
+        """.trimIndent(), parentClassName, parentClassName)
 
         // parse other attrs here...
 
-        constructorBuilder.addCode("""
-            this.$name.setLayoutParams($layoutParamsName);
+        constructorBuilder.addStatement("""
+            this.$name.setLayoutParams($layoutParamsName)
         """.trimIndent())
 
         if (!isRoot) {
-            constructorBuilder.addCode("""
-                this.${parent.id}.addView(this.$name);
+            constructorBuilder.addStatement("""
+                this.${parent.id}.addView(this.$name)
             """.trimIndent())
         }
 
@@ -153,20 +158,20 @@ class LayoutParser(
     }
 
     private fun setRoot(node: ViewType) {
-        val rootViewClassName = node.type.parseClassName()
+        val rootViewClassName = node.type.toClassName()
         val root = FieldSpec.builder(rootViewClassName, ROOT_VIEW_NAME,
                 Modifier.PRIVATE, Modifier.FINAL).build()
         fields.add(root)
 
-        constructorBuilder.addCode("""
-            this.$ROOT_VIEW_NAME = this.${node.id};
+        constructorBuilder.addStatement("""
+            this.$ROOT_VIEW_NAME = this.${node.id}
         """.trimIndent())
 
         val getRootView = MethodSpec.methodBuilder("getRootView").apply {
             addModifiers(Modifier.PUBLIC)
             returns(rootViewClassName)
-            addCode("""
-                return $ROOT_VIEW_NAME;
+            addStatement("""
+                return $ROOT_VIEW_NAME
             """.trimIndent())
         }.build()
         methods.add(getRootView)
@@ -195,22 +200,26 @@ class LayoutParser(
     private fun initToolsMethods() {
         val create = MethodSpec.methodBuilder("create").apply {
             addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-            addParameter(CONTEXT_CLASS_NAME, "context")
+            addParameter(cnContext, "context")
             returns(generateClassName)
-            addCode("""
-                return new $T(context);
+            addStatement("""
+                return new $T(context)
             """.trimIndent(), generateClassName)
         }.build()
         methods.add(create)
         val setContentView = MethodSpec.methodBuilder("setContentView").apply {
             addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-            addParameter(ACTIVITY_CLASSNAME, "activity")
+            addParameter(cnActivity, "activity")
             returns(generateClassName)
-            addCode("""
-                $T layout = $T.create(activity);
-                activity.setContentView(layout.$ROOT_VIEW_NAME);
-                return layout;
+            addStatement("""
+                $T layout = $T.create(activity)
             """.trimIndent(), generateClassName, generateClassName)
+            addStatement("""
+                activity.setContentView(layout.$ROOT_VIEW_NAME)
+            """.trimIndent())
+            addStatement("""
+                return layout
+            """.trimIndent())
         }.build()
         methods.add(setContentView)
     }
@@ -223,37 +232,4 @@ class LayoutParser(
 
     private fun String.findNumber() = split("\\D").joinToString(separator = "").toInt()
     private fun String.findNonNumber() = split("\\d").joinToString(separator = "")
-    private fun String.parsePackageName(): String {
-        var packageName = this
-        val dot = packageName.lastIndexOf(".")
-        if (dot > 0) {
-            packageName = packageName.substring(0, dot)
-        } else {
-            packageName = ""
-        }
-        return packageName
-    }
-    private fun String.parseSimpleClassName(): String {
-        var simpleName = this
-        val dot = simpleName.lastIndexOf(".")
-        if (dot > 0) {
-            simpleName = simpleName.substring(dot + 1)
-        }
-        return simpleName
-    }
-    private fun String.parseClassName() = ClassName.get(parsePackageName(), parseSimpleClassName())
-    private fun String.underlineToUpperCamel(): String {
-        val words = split("_")
-        return words.joinToString(separator = "") { it.upperCaseFirst() }
-    }
-    private fun String.upperCaseFirst(): String {
-        val sb = StringBuilder()
-        if (length > 0) {
-            sb.append(substring(0, 1).toUpperCase())
-            if (length > 1) {
-                sb.append(substring(1))
-            }
-        }
-        return sb.toString()
-    }
 }

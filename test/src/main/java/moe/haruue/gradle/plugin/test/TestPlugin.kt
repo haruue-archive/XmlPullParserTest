@@ -80,7 +80,7 @@ class TestPlugin : Plugin<Project> {
                 it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.packageName"] = packageName
                 it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.buildDir"] = buildDir.absolutePath
                 it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.resDirs"] = resDirs.joinToString(separator = ",")
-                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.layouts"] = resDirs.joinToString(separator = ",")
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.layouts"] = layouts.joinToString(separator = ",")
 
             }
         }

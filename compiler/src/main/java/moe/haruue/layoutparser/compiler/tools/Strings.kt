@@ -26,7 +26,7 @@ fun String.parseSimpleClassName(): String {
     return simpleName
 }
 
-fun String.parseClassName() = ClassName.get(parsePackageName(), parseSimpleClassName())
+fun String.toClassName(): ClassName = ClassName.get(parsePackageName(), parseSimpleClassName())
 
 fun String.underlineToUpperCamel(): String {
     val words = split("_")

@@ -3,6 +3,7 @@ package moe.haruue.layoutparser.compiler
 import com.google.auto.service.AutoService
 import moe.haruue.annotation.LayoutAdapter
 import moe.haruue.annotation.ViewCreator
+import org.xmlpull.mxp1.MXParserFactory
 import java.io.File
 import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
@@ -24,17 +25,28 @@ class LayoutProcessor : AbstractProcessor() {
 
     lateinit var rootDir: File
     lateinit var projectDir: File
-    lateinit var packageName: File
+    lateinit var packageName: String
     lateinit var buildDir: File
     lateinit var resDirs: List<File>
     lateinit var layouts: List<File>
+    var complete = false
+
+
+    val xmlPullParser by lazy {
+        val factory = MXParserFactory.newInstance()
+        with(factory) {
+            isNamespaceAware = true
+        }
+        factory.newPullParser()
+    }
+
 
     override fun init(processingEnv: ProcessingEnvironment) {
         super.init(processingEnv)
 
         rootDir = File(processingEnv.options["layoutinflater.rootDir"])
         projectDir = File(processingEnv.options["layoutinflater.projectDir"])
-        packageName = File(processingEnv.options["layoutinflater.packageName"])
+        packageName = processingEnv.options["layoutinflater.packageName"]!!
         buildDir = File(processingEnv.options["layoutinflater.buildDir"])
         resDirs = processingEnv.options["layoutinflater.resDirs"]!!.split(",").map { File(it) }
         layouts = processingEnv.options["layoutinflater.layouts"]!!.split(",").map { File(it) }
@@ -66,6 +78,18 @@ class LayoutProcessor : AbstractProcessor() {
             }
         }
 
+        if (!complete) {
+            log("===== processing layout files =====")
+            val xml = xmlPullParser
+            for (layout in layouts) {
+                log("layout: $layout")
+                xml.setInput(layout.reader())
+                LayoutParser(packageName, layout.nameWithoutExtension, xml)
+                        .toJavaFile().writeTo(processingEnv.filer)
+            }
+            complete = true
+            log("===== processed layout files =====")
+        }
 
         log(">>>>> process() end")
         return false
@@ -74,7 +98,8 @@ class LayoutProcessor : AbstractProcessor() {
     override fun getSupportedAnnotationTypes(): MutableSet<String> {
         return mutableSetOf(
                 LayoutAdapter::class.java.name,
-                ViewCreator::class.java.name
+                ViewCreator::class.java.name,
+                "*"
         )
     }
 
