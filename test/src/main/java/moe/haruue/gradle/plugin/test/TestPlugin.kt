@@ -1,7 +1,9 @@
 package moe.haruue.gradle.plugin.test
 
 import com.android.build.gradle.AppExtension
-import com.squareup.javapoet.*
+import com.squareup.javapoet.JavaFile
+import com.squareup.javapoet.MethodSpec
+import com.squareup.javapoet.TypeSpec
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.xmlpull.mxp1.MXParserFactory
@@ -37,21 +39,6 @@ class TestPlugin : Plugin<Project> {
         log("project.buildFile: ${project.buildFile}")
         project.extensions.findByType(AppExtension::class.java).run {
             this ?: return@run
-            val res = sourceSets.map { it.res }.flatMap { it.sourceFiles }
-            val layouts = res.filter {
-                if (it.extension == "xml") {
-                    return@filter it.isLayout()
-                }
-                return@filter false
-            }
-            log("layouts: $layouts")
-            layouts.forEach {
-                val result = layout(it).toString()
-                log("xml parse result for $it: \n$result")
-                log("===============================")
-                log("xml java parse result for $it \n")
-            }
-
 
             val aptOutputRoot = File(project.buildDir.absolutePath, "generated/source/apt")
             log("aptOutputRoot: ${aptOutputRoot.absolutePath}")
@@ -88,7 +75,13 @@ class TestPlugin : Plugin<Project> {
                 val resDirs = sourceSets.map { it.res }.flatMap { it.srcDirs }
                 val layouts = sourceSets.map { it.res }.flatMap { it.sourceFiles }.filter { it.isLayout() }
 
-                writeBuildInfoFile(aptOutputDir, rootDir, projectDir, packageName, buildDir, resDirs, layouts)
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.rootDir"] = rootDir.absolutePath
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.projectDir"] = projectDir.absolutePath
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.packageName"] = packageName
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.buildDir"] = buildDir.absolutePath
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.resDirs"] = resDirs.joinToString(separator = ",")
+                it.javaCompileOptions.annotationProcessorOptions.arguments["layoutinflater.layouts"] = resDirs.joinToString(separator = ",")
+
             }
         }
     }
@@ -114,33 +107,6 @@ class TestPlugin : Plugin<Project> {
         }.build()
 
         javaFile.writeTo(dst)
-    }
-
-    private fun writeBuildInfoFile(aptOutputDir: File,
-                                   rootDir: File, projectDir: File, packageName: String,
-                                   buildDir: File, resDir: List<File>, layouts: List<File>) {
-
-        val annotation = AnnotationSpec.builder(
-                ClassName.get("moe.haruue.annotation", "LayoutBuildInfo")).apply {
-            addMember("rootDir", S, rootDir.absolutePath)
-            addMember("projectDir", S, projectDir.absolutePath)
-            addMember("packageName", S, packageName)
-            addMember("buildDir", S, buildDir.absolutePath)
-            addMember("resDirs", resDir.joinToString(separator = "\",\"",
-                    prefix = "{\"", postfix = "\"}") { it.absolutePath })
-            addMember("layouts", layouts.joinToString(separator = "\",\"",
-                    prefix = "{\"", postfix = "\"}") { it.absolutePath })
-        }.build()
-
-        val info = TypeSpec.classBuilder("LayoutBuildingInfoStub").apply {
-            addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            addAnnotation(annotation)
-        }.build()
-
-        val file = JavaFile.builder("$packageName.generated.layout", info)
-                .build()
-
-        file.writeTo(aptOutputDir)
     }
 
     private fun File.isLayout(): Boolean {

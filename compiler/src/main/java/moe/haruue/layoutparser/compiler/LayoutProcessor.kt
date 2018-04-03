@@ -2,11 +2,9 @@ package moe.haruue.layoutparser.compiler
 
 import com.google.auto.service.AutoService
 import moe.haruue.annotation.LayoutAdapter
-import moe.haruue.annotation.LayoutBuildInfo
 import moe.haruue.annotation.ViewCreator
-import javax.annotation.processing.AbstractProcessor
-import javax.annotation.processing.Processor
-import javax.annotation.processing.RoundEnvironment
+import java.io.File
+import javax.annotation.processing.*
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.ElementKind
 import javax.lang.model.element.ExecutableElement
@@ -14,12 +12,41 @@ import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 
 @AutoService(Processor::class)
+@SupportedOptions(
+        "layoutinflater.rootDir",
+        "layoutinflater.projectDir",
+        "layoutinflater.packageName",
+        "layoutinflater.buildDir",
+        "layoutinflater.resDirs",
+        "layoutinflater.layouts"
+)
 class LayoutProcessor : AbstractProcessor() {
 
+    lateinit var rootDir: File
+    lateinit var projectDir: File
+    lateinit var packageName: File
+    lateinit var buildDir: File
+    lateinit var resDirs: List<File>
+    lateinit var layouts: List<File>
 
+    override fun init(processingEnv: ProcessingEnvironment) {
+        super.init(processingEnv)
+
+        rootDir = File(processingEnv.options["layoutinflater.rootDir"])
+        projectDir = File(processingEnv.options["layoutinflater.projectDir"])
+        packageName = File(processingEnv.options["layoutinflater.packageName"])
+        buildDir = File(processingEnv.options["layoutinflater.buildDir"])
+        resDirs = processingEnv.options["layoutinflater.resDirs"]!!.split(",").map { File(it) }
+        layouts = processingEnv.options["layoutinflater.layouts"]!!.split(",").map { File(it) }
+
+        log("LayoutProcessor(rootDir=$rootDir, projectDir=$projectDir, packageName=$packageName, buildDir=$buildDir, resDirs=$resDirs, layouts=$layouts)")
+    }
 
     override fun process(annotations: MutableSet<out TypeElement>, roundEnv: RoundEnvironment): Boolean {
         log("<<<<< process() start, annotation=%s", annotations)
+
+
+
         val elements = roundEnv.getElementsAnnotatedWith(ViewCreator::class.java)
         for (e in elements) {
             val annotation = e.getAnnotation(ViewCreator::class.java)
@@ -47,8 +74,7 @@ class LayoutProcessor : AbstractProcessor() {
     override fun getSupportedAnnotationTypes(): MutableSet<String> {
         return mutableSetOf(
                 LayoutAdapter::class.java.name,
-                ViewCreator::class.java.name,
-                LayoutBuildInfo::class.java.name
+                ViewCreator::class.java.name
         )
     }
 
