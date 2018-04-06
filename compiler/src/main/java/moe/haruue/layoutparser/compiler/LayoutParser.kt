@@ -1,10 +1,7 @@
 package moe.haruue.layoutparser.compiler
 
 import com.squareup.javapoet.*
-import moe.haruue.layoutparser.compiler.tools.cnActivity
-import moe.haruue.layoutparser.compiler.tools.cnContext
-import moe.haruue.layoutparser.compiler.tools.toClassName
-import moe.haruue.layoutparser.compiler.tools.underlineToUpperCamel
+import moe.haruue.layoutparser.compiler.tools.*
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParser.*
 import java.util.*
@@ -45,7 +42,12 @@ class LayoutParser(
     val methods = mutableListOf<MethodSpec>()
     val fields = mutableListOf<FieldSpec>()
 
-    private data class ViewType(val id: String, val type: String)
+    private data class ViewType(val id: String, val type: String) {
+        val layoutParamsClass
+            get() = type.toClass()
+                    .getMethodRecursive("generateLayoutParams", cAttributeSet)
+                    .returnType
+    }
     private data class Dimension(val value: Int, val unit: String)
     private val stack = Stack<ViewType>()
     private var currentNoId = 0
@@ -134,13 +136,14 @@ class LayoutParser(
 
         val parentClassName = parent.type.toClassName()
         val layoutParamsName = layoutParamsNameOf(name)
+        val layoutParamsType = parent.layoutParamsClass
 
         constructorBuilder.addStatement("""
             this.$name = new $T(context)
         """.trimIndent(), typeClassName)
         constructorBuilder.addStatement("""
-            $T.LayoutParams $layoutParamsName = new $T.LayoutParams(${width.value}, ${height.value})
-        """.trimIndent(), parentClassName, parentClassName)
+            $T $layoutParamsName = new $T(${width.value}, ${height.value})
+        """.trimIndent(), layoutParamsType, layoutParamsType)
 
         // parse other attrs here...
 

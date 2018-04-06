@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import static android.view.ViewGroup.LayoutParams.*;
 
 /**
  * @author Haruue Icymoon haruue@caoyue.com.cn
@@ -38,7 +39,9 @@ public class ActivityJavaLayout {
         // get these two guys from attrs first
         // construct parent layout's LayoutParams Class, get its type from stack.peek().type
         //      android:layout_width="wrap_content" android:layout_height="wrap_content"
-        LinearLayout.LayoutParams text1Param = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams text1Param = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        text1Param.width = WRAP_CONTENT;
+        text1Param.height = WRAP_CONTENT;
         // than ignore the id, layout_width and layout_height, find other thing...
         // begin with layout --> param.xxxxxx
         //      android:layout_gravity="start"

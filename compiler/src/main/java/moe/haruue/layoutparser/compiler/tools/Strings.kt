@@ -1,7 +1,5 @@
 package moe.haruue.layoutparser.compiler.tools
 
-import com.squareup.javapoet.ClassName
-
 /**
  *
  * @author Haruue Icymoon haruue@caoyue.com.cn
@@ -25,8 +23,6 @@ fun String.parseSimpleClassName(): String {
     }
     return simpleName
 }
-
-fun String.toClassName(): ClassName = ClassName.get(parsePackageName(), parseSimpleClassName())
 
 fun String.underlineToUpperCamel(): String {
     val words = split("_")
